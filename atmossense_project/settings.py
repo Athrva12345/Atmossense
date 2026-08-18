@@ -46,10 +46,12 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'django_prometheus',
+    'corsheaders',
     'weather',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django_prometheus.middleware.PrometheusBeforeMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -202,3 +204,8 @@ LOGGING = {
     },
 }
 
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]

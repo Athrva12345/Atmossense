@@ -12,3 +12,4 @@ pytest
 pytest-django
 django-prometheus
 python-json-logger
+django-cors-headers
