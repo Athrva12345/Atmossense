@@ -150,3 +150,10 @@ WEATHER_API_KEY = env('WEATHER_API_KEY', default='dummy_key')
 # Redis connection for rate limiting
 REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
 
+# Celery Configuration
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='amqp://guest:guest@localhost:5672//')
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default=REDIS_URL)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
