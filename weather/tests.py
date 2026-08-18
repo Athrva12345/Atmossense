@@ -160,3 +160,34 @@ class TestCaching:
         
         assert response.status_code == 200
         assert response['Cache-Control'] == 'public, max-age=3600'
+
+class TestHealthEndpoints:
+    def test_liveness_probe(self, api_client):
+        url = reverse('health')
+        response = api_client.get(url)
+        assert response.status_code == 200
+        assert response.json()['status'] == 'ok'
+
+    @patch('weather.health.connections')
+    @patch('weather.health.cache.set')
+    def test_readiness_probe_success(self, mock_cache_set, mock_connections, api_client):
+        mock_cursor = MagicMock()
+        mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
+        mock_cache_set.return_value = True
+        
+        url = reverse('ready')
+        response = api_client.get(url)
+        
+        assert response.status_code == 200
+        assert response.json()['status'] == 'ready'
+
+    @patch('weather.health.connections')
+    def test_readiness_probe_db_failure(self, mock_connections, api_client):
+        mock_connections.__getitem__.return_value.cursor.side_effect = Exception("DB Down")
+        
+        url = reverse('ready')
+        response = api_client.get(url)
+        
+        assert response.status_code == 503
+        assert response.json()['status'] == 'error'
+        assert response.json()['services']['db'] == 'error'
