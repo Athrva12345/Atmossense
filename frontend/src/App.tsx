@@ -19,22 +19,20 @@ ChartJS.register(
   Tooltip,
 );
 
-const generateChartData = (currentTemp: number, predictedTemp: number) => {
-  const diff = predictedTemp - currentTemp;
-  return [
-    currentTemp + diff * 0.2,
-    currentTemp + diff * 0.4,
-    currentTemp + diff * 0.6,
-    currentTemp + diff * 0.8,
-    predictedTemp,
-  ];
-};
+interface WeatherData {
+  city: string;
+  current_temp: number;
+  predicted_temp_in_5_hours: number;
+  forecast_5_hours: number[];
+  ml_features_used: string[];
+  model_version: string;
+}
 
 function App() {
   const [city, setCity] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [result, setResult] = useState<any | null>(null);
+  const [result, setResult] = useState<WeatherData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -91,14 +89,26 @@ function App() {
   }, [jobId, status]);
 
   const displayCity = result?.city || 'Search City';
-  const currentTemp = result?.current_temp;
-  const predictedTemp = result?.predicted_temp_in_5_hours;
+  const currentTemp = result?.current_temp || 0;
+  const predictedTemp = result?.predicted_temp_in_5_hours || currentTemp;
+  
+  let validForecast = result?.forecast_5_hours;
+  if (!validForecast || validForecast.length === 0 || validForecast.every(v => v === 0)) {
+    const diff = predictedTemp - currentTemp;
+    validForecast = [
+      currentTemp + diff * 0.2,
+      currentTemp + diff * 0.4,
+      currentTemp + diff * 0.6,
+      currentTemp + diff * 0.8,
+      predictedTemp
+    ];
+  }
   
   const chartData = {
-    labels: ['+1h', '+2h', '+3h', '+4h', '+5h'],
+    labels: ['Now', '+1h', '+2h', '+3h', '+4h', '+5h'],
     datasets: [
       {
-        data: result ? generateChartData(currentTemp, predictedTemp) : [15, 16, 17, 18, 19],
+        data: [currentTemp, ...validForecast],
         borderColor: '#f97316',
         borderWidth: 2,
         pointRadius: 3,
@@ -122,7 +132,7 @@ function App() {
   };
 
   const timeCols = ['+1h', '+2h', '+3h', '+4h', '+5h'];
-  const dataCols = result ? generateChartData(currentTemp, predictedTemp) : [15, 16, 17, 18, 19];
+  const dataCols = validForecast;
   const humidityCols = ['62%', '63%', '64%', '65%', '66%'];
 
   const dateNow = new Date();

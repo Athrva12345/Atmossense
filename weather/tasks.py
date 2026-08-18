@@ -37,10 +37,23 @@ def predict_weather(self, city):
     model = get_ml_model()
     predicted_temp = model.predict(df)[0]
     
+    current_temp = float(df.iloc[0]['temp'])
+    predicted_temp_float = float(predicted_temp)
+    diff = predicted_temp_float - current_temp
+    
+    forecast_5_hours = [
+        round(current_temp + diff * 0.2, 2),
+        round(current_temp + diff * 0.4, 2),
+        round(current_temp + diff * 0.6, 2),
+        round(current_temp + diff * 0.8, 2),
+        round(predicted_temp_float, 2)
+    ]
+    
     result = {
         "city": city,
-        "current_temp": float(df.iloc[0]['temp']),
-        "predicted_temp_in_5_hours": round(float(predicted_temp), 2),
+        "current_temp": current_temp,
+        "predicted_temp_in_5_hours": round(predicted_temp_float, 2),
+        "forecast_5_hours": forecast_5_hours,
         "ml_features_used": list(df.columns),
         "model_version": "v1.0"
     }
