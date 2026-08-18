@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from drf_spectacular.utils import extend_schema, OpenApiParameter
+from django.core.cache import cache
 from .client import WeatherClient
 from .throttles import TokenBucketThrottle
 from .tasks import predict_weather
@@ -21,6 +22,18 @@ class ForecastAPIView(APIView):
         if not city:
             return Response({"error": "city parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Check cache first
+        cache_key = f"atmossense:ml_forecast:{city.lower()}"
+        cached_forecast = cache.get(cache_key)
+        if cached_forecast:
+            response = Response(
+                {"message": "Forecast retrieved from cache", "data": cached_forecast},
+                status=status.HTTP_200_OK
+            )
+            # Edge cache simulation for CDN
+            response['Cache-Control'] = 'public, max-age=3600'
+            return response
+
         # Enqueue the ML task
         task = predict_weather.delay(city)
         return Response(
@@ -39,4 +52,11 @@ class JobStatusAPIView(APIView):
             'status': result.status,
             'result': result.result if result.ready() else None
         }
+        
+        if result.ready() and result.status == 'SUCCESS':
+            response = Response(response_data, status=status.HTTP_200_OK)
+            # Edge cache simulation for completed ML forecast jobs
+            response['Cache-Control'] = 'public, max-age=3600'
+            return response
+            
         return Response(response_data, status=status.HTTP_200_OK)

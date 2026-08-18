@@ -10,6 +10,14 @@ from celery.result import AsyncResult
 def api_client():
     return APIClient()
 
+@pytest.fixture(autouse=True)
+def override_cache(settings):
+    settings.CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
+
 class TestWeatherClient:
     @patch('weather.client.requests.get')
     def test_get_weather_success(self, mock_get):
@@ -97,3 +105,58 @@ class TestCeleryTasks:
         assert result['city'] == 'NYC'
         assert result['current_temp'] == 22.0
         assert 'predicted_temp_in_5_hours' in result
+
+from django.core.cache import cache
+
+class TestCaching:
+    def setup_method(self):
+        cache.clear()
+
+    @patch('weather.client.requests.get')
+    def test_client_caching(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"temp": 25.0}
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        client = WeatherClient()
+        
+        # Cache Miss
+        result1 = client.get_weather('London')
+        assert result1 == {"temp": 25.0}
+        assert mock_get.call_count == 1
+        
+        # Cache Hit
+        result2 = client.get_weather('London')
+        assert result2 == {"temp": 25.0}
+        assert mock_get.call_count == 1  # Should not have been called again
+
+    @patch('weather.throttles.redis_client.register_script')
+    def test_forecast_api_edge_cache_hit(self, mock_redis_script, api_client):
+        # Mock Redis Lua script to always allow request
+        mock_script_exec = MagicMock(return_value=1)
+        mock_redis_script.return_value = mock_script_exec
+        
+        cache_key = "atmossense:ml_forecast:nyc"
+        cache.set(cache_key, {"predicted_temp": 22.0}, timeout=3600)
+        
+        url = reverse('forecast')
+        response = api_client.get(url, {'city': 'NYC'})
+        
+        assert response.status_code == 200
+        assert response.json()['message'] == "Forecast retrieved from cache"
+        assert response['Cache-Control'] == 'public, max-age=3600'
+        
+    @patch('weather.views.AsyncResult')
+    def test_job_status_edge_cache_headers(self, mock_async_result, api_client):
+        mock_result = MagicMock()
+        mock_result.status = 'SUCCESS'
+        mock_result.ready.return_value = True
+        mock_result.result = {'predicted_temp_in_5_hours': 25.0}
+        mock_async_result.return_value = mock_result
+        
+        url = reverse('job-status', args=['fake-job-id'])
+        response = api_client.get(url)
+        
+        assert response.status_code == 200
+        assert response['Cache-Control'] == 'public, max-age=3600'

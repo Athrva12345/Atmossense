@@ -147,8 +147,12 @@ SPECTACULAR_SETTINGS = {
 WEATHER_API_URL = env('WEATHER_API_URL', default='https://api.openweathermap.org/data/2.5/')
 WEATHER_API_KEY = env('WEATHER_API_KEY', default='dummy_key')
 
-# Redis connection for rate limiting
+# Redis connection for rate limiting and cache
 REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
+
+CACHES = {
+    'default': env.cache_url('REDIS_URL', default='redis://localhost:6379/1')
+}
 
 # Celery Configuration
 CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='amqp://guest:guest@localhost:5672//')

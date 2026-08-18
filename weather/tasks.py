@@ -35,9 +35,16 @@ def predict_weather(self, city):
     
     predicted_temp = model.predict(df)[0]
     
-    return {
+    result = {
         "city": city,
         "current_temp": df.iloc[0]['temp'],
         "predicted_temp_in_5_hours": round(predicted_temp, 2),
         "ml_features_used": list(df.columns)
     }
+    
+    # Cache the ML forecast for 1 hour (3600 seconds)
+    from django.core.cache import cache
+    cache_key = f"atmossense:ml_forecast:{city.lower()}"
+    cache.set(cache_key, result, timeout=3600)
+    
+    return result
