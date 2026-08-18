@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'drf_spectacular',
     'weather',
 ]
 
@@ -129,3 +131,22 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'AtmosSense API',
+    'DESCRIPTION': 'Weather Forecasting Backend API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
+
+# External API settings
+WEATHER_API_URL = env('WEATHER_API_URL', default='https://api.openweathermap.org/data/2.5/')
+WEATHER_API_KEY = env('WEATHER_API_KEY', default='dummy_key')
+
+# Redis connection for rate limiting
+REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
+
