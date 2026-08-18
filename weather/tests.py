@@ -105,6 +105,8 @@ class TestCeleryTasks:
         assert result['city'] == 'NYC'
         assert result['current_temp'] == 22.0
         assert 'predicted_temp_in_5_hours' in result
+        assert isinstance(result['predicted_temp_in_5_hours'], float)
+        assert result['model_version'] == 'v1.0'
 
 from django.core.cache import cache
 

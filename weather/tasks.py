@@ -1,14 +1,25 @@
-import time
+import os
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+import joblib
 from celery import shared_task
+from django.conf import settings
 from .client import WeatherClient
+
+# Singleton model loader
+_ml_model = None
+
+def get_ml_model():
+    global _ml_model
+    if _ml_model is None:
+        model_path = os.path.join(settings.BASE_DIR, 'ml', 'models', 'weather_model_v1.joblib')
+        _ml_model = joblib.load(model_path)
+    return _ml_model
 
 @shared_task(bind=True)
 def predict_weather(self, city):
     """
-    Dummy ML pipeline: fetches real data, creates a dataframe,
-    and runs a simple Random Forest simulation using scikit-learn.
+    ML pipeline: fetches real data, creates a dataframe,
+    and runs the trained Random Forest model.
     """
     client = WeatherClient()
     try:
@@ -16,30 +27,22 @@ def predict_weather(self, city):
     except Exception as e:
         return {"error": str(e)}
 
-    # Simulate ML feature extraction with pandas
+    # Extract ML features
     df = pd.DataFrame([{
         'temp': data.get('main', {}).get('temp', 20),
         'humidity': data.get('main', {}).get('humidity', 50),
         'pressure': data.get('main', {}).get('pressure', 1000)
     }])
     
-    # Simulate an ML inference load (CPU bound)
-    time.sleep(2)
-    
-    # Dummy Scikit-learn model logic
-    model = RandomForestRegressor(n_estimators=10, random_state=42)
-    # Fit on dummy historical data just for structural compliance
-    dummy_x = pd.DataFrame({'temp': [15, 20, 25], 'humidity': [40, 50, 60], 'pressure': [1010, 1000, 990]})
-    dummy_y = [16, 21, 24]  # Predicted future temperatures
-    model.fit(dummy_x, dummy_y)
-    
+    model = get_ml_model()
     predicted_temp = model.predict(df)[0]
     
     result = {
         "city": city,
-        "current_temp": df.iloc[0]['temp'],
-        "predicted_temp_in_5_hours": round(predicted_temp, 2),
-        "ml_features_used": list(df.columns)
+        "current_temp": float(df.iloc[0]['temp']),
+        "predicted_temp_in_5_hours": round(float(predicted_temp), 2),
+        "ml_features_used": list(df.columns),
+        "model_version": "v1.0"
     }
     
     # Cache the ML forecast for 1 hour (3600 seconds)
