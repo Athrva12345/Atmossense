@@ -37,5 +37,17 @@ services:
       - redis
       - rabbitmq
 
+  celery_worker:
+    build: .
+    command: celery -A atmossense_project worker -l info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+      - rabbitmq
+
 volumes:
   postgres_data:
