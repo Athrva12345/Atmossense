@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { FaSearch, FaMapMarkerAlt, FaCloudSun, FaSpinner } from 'react-icons/fa';
+import { useState, useEffect, useRef } from 'react';
+import { FaSearch, FaMapMarkerAlt, FaCloudSun, FaSpinner, FaMicrochip } from 'react-icons/fa';
 import { getForecast, getJobStatus } from './services/api';
 import {
   Chart as ChartJS,
@@ -35,19 +35,31 @@ function App() {
   const [result, setResult] = useState<WeatherData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!city.trim()) return;
     
+    // Abort previous request if still running
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
     setJobId(null);
     setStatus(null);
     setResult(null);
     setError(null);
+    setIsRateLimited(false);
     setLoading(true);
 
     try {
-      const data = await getForecast(city);
+      const data = await getForecast(city, abortController.signal);
       if (data.job_id) {
         setJobId(data.job_id);
       } else if (data.data) {
@@ -59,7 +71,13 @@ function App() {
         setLoading(false);
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'An error occurred');
+      if (err.name === 'CanceledError') return; // Ignore aborts
+      
+      if (err.response?.status === 429) {
+        setIsRateLimited(true);
+      } else {
+        setError(err.response?.data?.error || err.message || 'An error occurred');
+      }
       setLoading(false);
     }
   };
@@ -67,25 +85,47 @@ function App() {
   useEffect(() => {
     if (!jobId || status === 'SUCCESS' || status === 'FAILURE') return;
 
-    const interval = setInterval(async () => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let isCancelled = false;
+    let delay = 1000;
+    const maxDelay = 5000;
+    
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    const poll = async () => {
       try {
-        const data = await getJobStatus(jobId);
+        const data = await getJobStatus(jobId, abortController.signal);
+        if (isCancelled) return;
+        
         setStatus(data.status);
         if (data.status === 'SUCCESS') {
           setResult(data.result);
           setLoading(false);
-          clearInterval(interval);
         } else if (data.status === 'FAILURE') {
           setError('Job failed to process.');
           setLoading(false);
-          clearInterval(interval);
+        } else {
+          // Exponential backoff
+          delay = Math.min(delay * 1.5, maxDelay);
+          timeoutId = setTimeout(poll, delay);
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err.name === 'CanceledError' || isCancelled) return;
         console.error("Polling error", err);
+        // Retry even on error with backoff to be resilient
+        delay = Math.min(delay * 1.5, maxDelay);
+        timeoutId = setTimeout(poll, delay);
       }
-    }, 1500);
+    };
 
-    return () => clearInterval(interval);
+    timeoutId = setTimeout(poll, delay);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timeoutId);
+      abortController.abort();
+    };
   }, [jobId, status]);
 
   const displayCity = result?.city || 'Search City';
@@ -160,7 +200,7 @@ function App() {
                  onChange={(e) => setCity(e.target.value)}
                  className="w-full bg-transparent border-none text-white placeholder-white/60 focus:outline-none"
                />
-               <button type="submit" disabled={loading} className="text-white/80 hover:text-white transition">
+               <button type="submit" disabled={loading} className="text-white/80 hover:text-white transition" data-testid="search-button">
                  {loading && !result ? <FaSpinner className="animate-spin" /> : <FaSearch />}
                </button>
              </div>
@@ -171,7 +211,7 @@ function App() {
             <>
               <div className="mt-12 flex-1">
                  <div className="mb-2">
-                   <h1 className="text-6xl font-light tracking-tight">{currentTemp}°</h1>
+                   <h1 className="text-6xl font-light tracking-tight">{currentTemp.toFixed(0)}°</h1>
                  </div>
                  <p className="text-sm text-white/70">Feels like: {(currentTemp + 1.2).toFixed(1)}°</p>
               </div>
@@ -194,13 +234,23 @@ function App() {
         <div className="w-full md:w-[70%] p-10 flex flex-col justify-between flex-1 relative">
           
           {loading && !result && (
-             <div className="flex-1 flex flex-col items-center justify-center opacity-80 space-y-4">
+             <div className="flex-1 flex flex-col items-center justify-center opacity-80 space-y-4" data-testid="pending-state">
                 <FaSpinner className="animate-spin text-4xl text-white/80" />
                 <p className="text-lg">Processing forecast with ML model...</p>
              </div>
           )}
 
-          {!result && !loading && (
+          {isRateLimited && !loading && !result && (
+             <div className="flex-1 flex flex-col items-center justify-center opacity-90 space-y-4 text-center" data-testid="rate-limit-error">
+                <div className="p-4 bg-orange-500/20 rounded-full border border-orange-500/50">
+                  <FaCloudSun className="text-5xl text-orange-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-white">Whoa, slow down!</h3>
+                <p className="text-lg font-light text-white/80">Too many requests. Please wait a moment.</p>
+             </div>
+          )}
+
+          {!result && !loading && !isRateLimited && (
              <div className="flex-1 flex flex-col items-center justify-center opacity-70 space-y-4 text-center">
                 <FaSearch className="text-6xl mb-4 text-white/50" />
                 <p className="text-xl font-light">Enter a city to generate an AI-powered forecast.</p>
@@ -210,7 +260,15 @@ function App() {
           {result && (
             <>
               <div>
-                <p className="text-xs uppercase tracking-widest text-white/70 mb-2">Weather Forecast</p>
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-xs uppercase tracking-widest text-white/70">Weather Forecast</p>
+                  {result.model_version && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-200 border border-blue-500/30" data-testid="model-version">
+                      <FaMicrochip className="mr-1.5" />
+                      Model: {result.model_version}
+                    </span>
+                  )}
+                </div>
                 <h2 className="text-5xl font-bold mb-4 capitalize">
                    Scattered Clouds
                 </h2>
