@@ -11,7 +11,7 @@ _ml_model = None
 def get_ml_model():
     global _ml_model
     if _ml_model is None:
-        model_path = os.path.join(settings.BASE_DIR, 'ml', 'models', 'weather_model_v1.joblib')
+        model_path = os.path.join(settings.BASE_DIR, 'ml', 'models', 'model_v1.joblib')
         _ml_model = joblib.load(model_path)
     return _ml_model
 
@@ -28,10 +28,14 @@ def predict_weather(self, city):
         return {"error": str(e)}
 
     # Extract ML features
+    import datetime
+    now = datetime.datetime.now()
     df = pd.DataFrame([{
         'temp': data.get('main', {}).get('temp', 20),
         'humidity': data.get('main', {}).get('humidity', 50),
-        'pressure': data.get('main', {}).get('pressure', 1000)
+        'pressure': data.get('main', {}).get('pressure', 1000),
+        'hour': now.hour,
+        'month': now.month
     }])
     
     model = get_ml_model()

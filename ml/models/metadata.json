@@ -1,0 +1,22 @@
+{
+    "training_date": "2026-08-19T18:41:53.595216",
+    "model_version": "v1.0",
+    "algorithm": "RandomForestRegressor",
+    "hyperparameters": {
+        "n_estimators": 100,
+        "max_depth": 10,
+        "random_state": 42
+    },
+    "features": [
+        "temp",
+        "humidity",
+        "pressure",
+        "hour",
+        "month"
+    ],
+    "metrics": {
+        "mae": 2.6444,
+        "rmse": 3.3632,
+        "r2": 0.807
+    }
+}
