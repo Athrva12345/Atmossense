@@ -22,10 +22,9 @@ def predict_weather(self, city):
     and runs the trained Random Forest model.
     """
     client = WeatherClient()
-    try:
-        data = client.get_weather(city)
-    except Exception as e:
-        return {"error": str(e)}
+    # DO NOT swallow the exception. If it fails (e.g. 401 Unauthorized), 
+    # it should raise and mark the Celery task as FAILURE!
+    data = client.get_weather(city)
 
     # Extract ML features
     import datetime
@@ -59,7 +58,15 @@ def predict_weather(self, city):
         "predicted_temp_in_5_hours": round(predicted_temp_float, 2),
         "forecast_5_hours": forecast_5_hours,
         "ml_features_used": list(df.columns),
-        "model_version": "v1.0"
+        "model_version": "v1.0",
+        
+        # Real Live Weather Data for the UI
+        "description": data.get("weather", [{}])[0].get("description", "clear sky"),
+        "wind_speed": data.get("wind", {}).get("speed", 0),
+        "pressure": data.get("main", {}).get("pressure", 0),
+        "visibility": data.get("visibility", 0),
+        "humidity": data.get("main", {}).get("humidity", 0),
+        "clouds": data.get("clouds", {}).get("all", 0),
     }
     
     # Cache the ML forecast for 1 hour (3600 seconds)

@@ -6,7 +6,11 @@ class WeatherClient:
     def __init__(self):
         self.base_url = settings.WEATHER_API_URL
         self.api_key = settings.WEATHER_API_KEY
-
+        if not self.api_key or self.api_key == 'dummy_key':
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error("CRITICAL ERROR: OPENWEATHER_API_KEY is missing from .env! OpenWeatherMap API requests will fail.")
+            
     def get_weather(self, city):
         """Fetch current weather data from external API, with caching."""
         cache_key = f"atmossense:external_weather:{city.lower()}"
