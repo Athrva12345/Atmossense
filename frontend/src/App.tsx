@@ -26,6 +26,12 @@ interface WeatherData {
   forecast_5_hours: number[];
   ml_features_used: string[];
   model_version: string;
+  description?: string;
+  wind_speed?: number;
+  pressure?: number;
+  visibility?: number;
+  humidity?: number;
+  clouds?: number;
 }
 
 function App() {
@@ -219,11 +225,11 @@ function App() {
               <div className="mt-8">
                  <div className="flex items-center justify-between border-b border-white/20 pb-3 mb-3">
                     <span className="text-white/80">Humidity</span>
-                    <span className="font-semibold">64%</span>
+                    <span className="font-semibold">{result.humidity ?? 64}%</span>
                  </div>
                  <div className="flex items-center justify-between border-b border-white/20 pb-3">
                     <span className="text-white/80">Clouds</span>
-                    <span className="font-semibold">40%</span>
+                    <span className="font-semibold">{result.clouds ?? 40}%</span>
                  </div>
               </div>
             </>
@@ -270,7 +276,7 @@ function App() {
                   )}
                 </div>
                 <h2 className="text-5xl font-bold mb-4 capitalize">
-                   Scattered Clouds
+                   {result.description || "Scattered Clouds"}
                 </h2>
                 <div className="flex items-center space-x-2 text-white/80 text-sm">
                   <FaMapMarkerAlt className="text-white/60" />
@@ -278,7 +284,7 @@ function App() {
                 </div>
                 
                 <p className="mt-8 text-white/70 leading-relaxed max-w-xl">
-                  Wind 12.3 km/h. Pressure is 1012 hPa. Visibility is 10000m. Maximum temperature is {(currentTemp + 2).toFixed(1)}°. Minimum temperature is {(currentTemp - 2).toFixed(1)}°.
+                  Wind {result.wind_speed ?? 12.3} km/h. Pressure is {result.pressure ?? 1012} hPa. Visibility is {result.visibility ?? 10000}m. Maximum temperature is {(currentTemp + 2).toFixed(1)}°. Minimum temperature is {(currentTemp - 2).toFixed(1)}°.
                 </p>
               </div>
 
